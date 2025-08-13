@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Report Definition -->
+    <record id="report_bg111_form" model="ir.actions.report">
+        <field name="name">ใบรับรองแทนใบเสร็จรับเงิน (บก.111)</field>
+        <field name="model">hr.expense.sheet</field>
+        <field name="report_type">qweb-html</field>
+        <field name="report_name">day.report_bg111_template</field>
+        <field name="report_file">day.report_bg111_template</field>
+        <field name="binding_model_id" ref="hr_expense.model_hr_expense_sheet"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="day.paperformat_expenses"/>
+    </record>
+
+    <!-- Helper template for Thai date conversion -->
+    <template id="thai_date_helper">
+        <t t-set="thai_months" t-value="[
+            'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 
+            'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 
+            'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+        ]"/>
+        <t t-set="thai_day_names" t-value="[
+            'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 
+            'ศุกร์', 'เสาร์', 'อาทิตย์'
+        ]"/>
+    </template>
+
+    <!-- Helper template for amount to Thai text -->
+    <template id="amount_to_thai_text">
+        <t t-set="thai_numbers" t-value="[
+            'ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 
+            'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'
+        ]"/>
+        <t t-set="thai_units" t-value="[
+            '', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'
+        ]"/>
+        
+        <!-- Simple implementation - you may want to enhance this -->
+        <t t-set="amount_int" t-value="int(amount)"/>
+        <t t-set="amount_decimal" t-value="int((amount - amount_int) * 100)"/>
+        
+        <span class="amount-text-thai">
+            <t t-if="amount_int == 0">ศูนย์บาท</t>
+            <t t-else="">
+                <!-- This is a simplified version - implement full Thai number conversion -->
+                <t t-esc="'{:,}'.format(amount_int).replace(',', '')"/> บาท
+            </t>
+            <t t-if="amount_decimal > 0">
+                <t t-esc="amount_decimal"/> สตางค์
+            </t>
+            <t t-else="">ถ้วน</t>
+        </span>
+    </template>
+
+    <!-- Report Template -->
+    <template id="report_bg111_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="day.thai_date_helper"/>
+                <div class="page">
+                    <!-- Include SCSS file -->
+                    <link rel="stylesheet" type="text/scss" href="/day/static/scss/style_report.scss"/>
+                    
+                    <div class="bg111-form">
+                        <h1>แบบ บก 111</h1>
+                        <h2>ใบรับรองแทนใบเสร็จรับเงิน</h2>
+
+                        <div class="form-row">
+                            <label>ส่วนราชการ</label>
+                            <span class="form-input">
+                                <t t-if="doc.department_id">
+                                    <t t-esc="doc.department_id.name"/>
+                                </t>
+                                <t t-else="">
+                                    <t t-esc="doc.company_id.name"/>
+                                </t>
+                            </span>
+                        </div>
+
+                        <div class="date-row">
+                            <div class="date-item">
+                                <label>วัน</label>
+                                <span class="form-input">
+                                    <t t-esc="doc.create_date.strftime('%d')"/>
+                                </span>
+                            </div>
+                            <div class="date-item">
+                                <label>เดือน</label>
+                                <span class="form-input">
+                                    <t t-esc="thai_months[doc.create_date.month - 1]"/>
+                                </span>
+                            </div>
+                            <div class="date-item">
+                                <label>ปี</label>
+                                <span class="form-input">
+                                    <t t-esc="doc.create_date.year + 543"/>
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="expense-table">
+                                <thead>
+                                    <tr>
+                                        <th>รายละเอียดรายจ่าย</th>
+                                        <th class="amount-col">จำนวนเงิน</th>
+                                        <th class="note-col">หมายเหตุ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="doc.expense_line_ids" t-as="line">
+                                        <tr>
+                                            <td>
+                                                <span t-field="line.name"/>
+                                                <t t-if="line.product_id">
+                                                    - <span t-field="line.product_id.name"/>
+                                                </t>
+                                            </td>
+                                            <td class="amount-col">
+                                                <span t-field="line.total_amount" 
+                                                      t-options="{'widget': 'monetary', 'display_currency': line.currency_id}"/>
+                                            </td>
+                                            <td>
+                                                <t t-if="line.reference">
+                                                    <span t-field="line.reference"/>
+                                                </t>
+                                                <t t-if="line.date">
+                                                    <br/>วันที่: <span t-field="line.date" t-options="{'format': 'dd/MM/yyyy'}"/>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <!-- Add empty rows for better formatting -->
+                                    <t t-set="remaining_rows" t-value="max(0, 5 - len(doc.expense_line_ids))"/>
+                                    <t t-if="remaining_rows > 0">
+                                        <t t-foreach="range(remaining_rows)" t-as="i">
+                                            <tr>
+                                                <td style="height: 30px;">&#160;</td>
+                                                <td class="amount-col">&#160;</td>
+                                                <td>&#160;</td>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="total-section">
+                            <div class="total-row">
+                                <label>รวมเป็นเงิน</label>
+                                <span class="form-input" t-field="doc.total_amount" 
+                                      t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                                <label>บาท</label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <label>รวมทั้งสิ้น (ตัวอักษร)</label>
+                            <span class="form-input">
+                                <t t-call="day.amount_to_thai_text">
+                                    <t t-set="amount" t-value="doc.total_amount"/>
+                                </t>
+                            </span>
+                        </div>
+
+                        <div class="certification-section">
+                            <div class="form-row">
+                                <label>ข้าพเจ้า</label>
+                                <span class="form-input">
+                                    <t t-if="doc.employee_id">
+                                        <t t-esc="doc.employee_id.name"/>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-esc="doc.create_uid.name"/>
+                                    </t>
+                                </span>
+                                <label>ตำแหน่ง</label>
+                                <span class="form-input">
+                                    <t t-if="doc.employee_id.job_id">
+                                        <t t-esc="doc.employee_id.job_id.name"/>
+                                    </t>
+                                    <t t-else="">เจ้าหน้าที่</t>
+                                </span>
+                            </div>
+
+                            <div class="form-row">
+                                <label>สำนักงาน</label>
+                                <span class="form-input" t-field="doc.company_id.name"/>
+                            </div>
+
+                            <p>ขอรับรองว่ารายจ่ายข้างต้นนี้ ไม่อาจเรียกใบเสร็จรับเงินจากผู้รับได้ และข้าพเจ้าได้จ่ายไปในงานของราชการโดยแท้</p>
+                        </div>
+
+                        <div class="signature-section">
+                            <div style="margin-bottom: 20px;">
+                                <label>ลงชื่อ</label>
+                                <span class="signature-line">
+                                    <t t-if="doc.employee_id and doc.employee_id.image_1920">
+                                        <!-- แสดง signature หากมี -->
+                                    </t>
+                                </span>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label>(</label>
+                                <span class="signature-line">
+                                    <t t-if="doc.employee_id">
+                                        <t t-esc="doc.employee_id.name"/>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-esc="doc.create_uid.name"/>
+                                    </t>
+                                </span>
+                                <label>)</label>
+                            </div>
+                            <div>
+                                <label>วันที่</label>
+                                <span class="signature-line">
+                                    <t t-esc="doc.create_date.strftime('%d')"/>/<t t-esc="doc.create_date.strftime('%m')"/>/<t t-esc="doc.create_date.year + 543"/>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
