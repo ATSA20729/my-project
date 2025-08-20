@@ -9,7 +9,7 @@ class HrExpenseSheet(models.Model):
     
     # เพิ่มฟิลด์ที่อาจจะต้องการสำหรับ บก.111
     bg111_certification_text = fields.Text(
-        string='ข้อความรับรong',
+        string='ข้อความรับรอง',
         default='ขอรับรองว่ารายจ่ายข้างต้นนี้ ไม่อาจเรียกใบเสร็จรับเงินจากผู้รับได้ และข้าพเจ้าได้จ่ายไปในงานของราชการโดยแท้'
     )
     
@@ -21,7 +21,7 @@ class HrExpenseSheet(models.Model):
     @api.model
     def amount_to_text_thai(self, amount):
         """
-        แปลงจำนวนเงินเป็นตัวอักษรภาษาไทย
+        แปลงจำนวนเงินเป็นตัวอักษรภาษาไทย - ปรับปรุงให้แม่นยำยิ่งขึ้น
         """
         if not amount:
             return "ศูนย์บาทถ้วน"
@@ -33,36 +33,47 @@ class HrExpenseSheet(models.Model):
             
             # ตัวเลขภาษาไทย
             thai_digits = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า']
-            thai_units = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่ง', 'แสน', 'ล้าน']
+            thai_units = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน']
             
-            def convert_group(num):
-                """แปลงเลขหลัก 1-6 หลัก"""
+            def convert_number(num):
+                """แปลงเลขเป็นคำไทย สำหรับเลข 0-999,999"""
                 if num == 0:
                     return ''
                 
                 result = ''
-                digits = str(num)[::-1]  # กลับลำดับ
+                str_num = str(num).zfill(6)  # เติม 0 ข้างหน้า
                 
-                for i, digit in enumerate(digits):
-                    digit_int = int(digit)
-                    if digit_int == 0:
-                        continue
-                        
-                    if i == 0:  # หลักหน่วย
-                        result = thai_digits[digit_int] + result
-                    elif i == 1:  # หลักสิบ
-                        if digit_int == 1:
-                            if len(digits) == 1 or (len(digits) > 1 and int(digits[0]) == 0):
-                                result = 'สิบ' + result
-                            else:
-                                result = 'สิบ' + result
-                        elif digit_int == 2:
-                            result = 'ยี่สิบ' + result
-                        else:
-                            result = thai_digits[digit_int] + 'สิบ' + result
-                    else:  # หลักร้อย, พัน, หมื่น, แสน
-                        if i < len(thai_units):
-                            result = thai_digits[digit_int] + thai_units[i] + result
+                # หลักแสน
+                if int(str_num[0]) > 0:
+                    result += thai_digits[int(str_num[0])] + 'แสน'
+                
+                # หลักหมื่น
+                if int(str_num[1]) > 0:
+                    result += thai_digits[int(str_num[1])] + 'หมื่น'
+                
+                # หลักพัน
+                if int(str_num[2]) > 0:
+                    result += thai_digits[int(str_num[2])] + 'พัน'
+                
+                # หลักร้อย
+                if int(str_num[3]) > 0:
+                    result += thai_digits[int(str_num[3])] + 'ร้อย'
+                
+                # หลักสิบ
+                if int(str_num[4]) > 0:
+                    if int(str_num[4]) == 1:
+                        result += 'สิบ'
+                    elif int(str_num[4]) == 2:
+                        result += 'ยี่สิบ'
+                    else:
+                        result += thai_digits[int(str_num[4])] + 'สิบ'
+                
+                # หลักหน่วย
+                if int(str_num[5]) > 0:
+                    if int(str_num[4]) > 0 and int(str_num[5]) == 1:
+                        result += 'เอ็ด'
+                    else:
+                        result += thai_digits[int(str_num[5])]
                 
                 return result
             
@@ -70,16 +81,16 @@ class HrExpenseSheet(models.Model):
             if amount_int == 0:
                 text_baht = 'ศูนย์บาท'
             else:
-                # แยกกลุ่มล้าน
+                # จัดการกรณีเกินล้าน
                 millions = amount_int // 1000000
                 remainder = amount_int % 1000000
                 
                 text_baht = ''
                 if millions > 0:
-                    text_baht += convert_group(millions) + 'ล้าน'
+                    text_baht += convert_number(millions) + 'ล้าน'
                 
                 if remainder > 0:
-                    text_baht += convert_group(remainder)
+                    text_baht += convert_number(remainder)
                 
                 text_baht += 'บาท'
             
@@ -87,7 +98,7 @@ class HrExpenseSheet(models.Model):
             if amount_decimal == 0:
                 text_satang = 'ถ้วน'
             else:
-                text_satang = convert_group(amount_decimal) + 'สตางค์'
+                text_satang = convert_number(amount_decimal) + 'สตางค์'
             
             return text_baht + text_satang
             

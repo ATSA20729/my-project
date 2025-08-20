@@ -1,8 +1,9 @@
 # Copyright 2023 Ecosoft Co., Ltd. (http://ecosoft.co.th)
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
+# -*- coding: utf-8 -*-
 
 {
-    "name": "Test report",
+    "name": "Test report - BG111 Thai Form",
     "version": "18.0.1.0.0",
     "author": "Ecosoft",
     "category": "Training",
@@ -18,7 +19,9 @@
         ],
     },
     "external_dependencies": {
-    "python": ['num2words'],  # ✅ สำหรับแปลงตัวเลขเป็นคำ
+        "python": ['num2words'],  # ✅ สำหรับแปลงตัวเลขเป็นคำ (ถ้าต้องการ)
     },
     "installable": True,
+    "auto_install": False,
+    
 }
